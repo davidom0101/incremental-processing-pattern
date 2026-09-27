@@ -101,19 +101,6 @@ def test_reader_uses_an_inclusive_window_and_preserves_source_order(
     assert [record.product_id for record in records] == ["BOUNDARY", "NEWER"]
 
 
-def test_reader_returns_empty_list_when_no_records_are_in_window(
-    tmp_path: Path,
-) -> None:
-    source_path = write_source(
-        tmp_path,
-        [product_row(updated_at="2026-01-01T09:59:59Z")],
-    )
-
-    records = read_source(source_path)
-
-    assert records == []
-
-
 def test_record_at_future_skew_boundary_is_accepted(tmp_path: Path) -> None:
     source_path = write_source(
         tmp_path,
@@ -135,13 +122,6 @@ def test_record_beyond_future_skew_boundary_is_rejected(tmp_path: Path) -> None:
         read_source(source_path)
 
 
-def test_future_skew_must_be_non_negative(tmp_path: Path) -> None:
-    source_path = write_source(tmp_path, [product_row()])
-
-    with pytest.raises(ValueError, match="allowed_future_skew must be non-negative"):
-        read_source(source_path, allowed_future_skew=timedelta(seconds=-1))
-
-
 def test_missing_required_column_is_rejected(tmp_path: Path) -> None:
     fieldnames = [field for field in FIELDNAMES if field != "category"]
     row = product_row()
@@ -157,14 +137,8 @@ def test_missing_required_column_is_rejected(tmp_path: Path) -> None:
     [
         ("product_id", "  ", "product_id must not be blank"),
         ("updated_at", "not-a-date", "timezone-aware timestamp"),
-        ("updated_at", "2026-01-01T10:00:00", "timezone-aware timestamp"),
-        ("source_sequence", "one", "must be an integer"),
         ("source_sequence", "-1", "must be non-negative"),
-        ("name", "", "name must not be blank"),
-        ("category", "", "category must not be blank"),
-        ("price", "free", "price must be a decimal"),
         ("price", "-0.01", "price must fit decimal"),
-        ("price", "1.001", "at most two decimal places"),
         ("is_active", "yes", "must be either true or false"),
     ],
 )

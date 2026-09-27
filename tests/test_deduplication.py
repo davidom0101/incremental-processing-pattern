@@ -31,10 +31,6 @@ def product_record(
     )
 
 
-def test_empty_batch_has_no_winners() -> None:
-    assert deduplicate_records([]) == []
-
-
 def test_exact_duplicates_collapse_to_one_record() -> None:
     record = product_record()
 

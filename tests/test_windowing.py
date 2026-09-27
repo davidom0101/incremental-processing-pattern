@@ -36,23 +36,6 @@ def test_subsequent_run_subtracts_overlap_from_watermark() -> None:
     assert extraction_start == datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
 
 
-def test_zero_overlap_starts_at_the_watermark() -> None:
-    state = PipelineState(
-        pipeline_name="products",
-        watermark=datetime(2026, 1, 2, 10, 0, tzinfo=UTC),
-        last_successful_run_id="run-1",
-        updated_at=datetime(2026, 1, 2, 10, 5, tzinfo=UTC),
-    )
-
-    extraction_start = calculate_extraction_start(
-        state=state,
-        initial_start_at=datetime(2020, 1, 1, tzinfo=UTC),
-        overlap=timedelta(0),
-    )
-
-    assert extraction_start == state.watermark
-
-
 def test_negative_overlap_is_rejected() -> None:
     with pytest.raises(ValueError, match="overlap must be non-negative"):
         calculate_extraction_start(

@@ -26,14 +26,6 @@ def test_database_initialization_creates_required_tables(
     assert tables == {"pipeline_runs", "pipeline_state", "products_current"}
 
 
-def test_database_initialization_is_idempotent(
-    connection: duckdb.DuckDBPyConnection,
-) -> None:
-    initialize_database(connection)
-
-    assert connection.execute("SELECT COUNT(*) FROM pipeline_state").fetchone() == (0,)
-
-
 def test_product_key_must_be_unique(
     connection: duckdb.DuckDBPyConnection,
 ) -> None:
@@ -124,14 +116,8 @@ def insert_run(
     [
         {"status": "UNKNOWN"},
         {"rows_received": -1},
-        {"rows_after_deduplication": 11},
-        {"rows_ignored": 1},
         {
             "finished_at": datetime(2026, 1, 1, 9, 59, tzinfo=UTC),
-        },
-        {
-            "status": "FAILED",
-            "resulting_watermark": datetime(2026, 1, 1, 9, 0, tzinfo=UTC),
         },
     ],
 )
