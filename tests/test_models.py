@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -41,3 +41,35 @@ def test_negative_source_sequence_is_rejected() -> None:
             updated_at=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
             source_sequence=-1,
         )
+
+
+def test_timestamp_is_normalized_to_utc() -> None:
+    utc_plus_two = timezone(timedelta(hours=2))
+
+    version = RecordVersion(
+        updated_at=datetime(2026, 1, 1, 12, 0, tzinfo=utc_plus_two),
+        source_sequence=1,
+    )
+
+    assert version.updated_at == datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
+    assert version.updated_at.tzinfo is UTC
+
+
+def test_equivalent_instants_have_equal_versions() -> None:
+    utc_version = RecordVersion(
+        updated_at=datetime(2026, 1, 1, 10, 0, tzinfo=UTC),
+        source_sequence=1,
+    )
+    offset_version = RecordVersion(
+        updated_at=datetime(
+            2026,
+            1,
+            1,
+            12,
+            0,
+            tzinfo=timezone(timedelta(hours=2)),
+        ),
+        source_sequence=1,
+    )
+
+    assert offset_version == utc_version
