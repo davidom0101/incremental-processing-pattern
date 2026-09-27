@@ -1,14 +1,9 @@
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-
-def _as_utc(value: datetime, field_name: str) -> datetime:
-    if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError(f"{field_name} must be timezone-aware")
-
-    return value.astimezone(UTC)
+from incremental_pipeline.timestamps import normalize_to_utc
 
 
 @dataclass(frozen=True, order=True)
@@ -22,7 +17,7 @@ class RecordVersion:
         object.__setattr__(
             self,
             "updated_at",
-            _as_utc(self.updated_at, "updated_at"),
+            normalize_to_utc(self.updated_at, "updated_at"),
         )
 
         if self.source_sequence < 0:
@@ -58,12 +53,12 @@ class PipelineState:
         object.__setattr__(
             self,
             "watermark",
-            _as_utc(self.watermark, "watermark"),
+            normalize_to_utc(self.watermark, "watermark"),
         )
         object.__setattr__(
             self,
             "updated_at",
-            _as_utc(self.updated_at, "updated_at"),
+            normalize_to_utc(self.updated_at, "updated_at"),
         )
 
 
@@ -95,18 +90,22 @@ class RunResult:
         object.__setattr__(
             self,
             "run_started_at",
-            _as_utc(self.run_started_at, "run_started_at"),
+            normalize_to_utc(self.run_started_at, "run_started_at"),
         )
         object.__setattr__(
             self,
             "extraction_start",
-            _as_utc(self.extraction_start, "extraction_start"),
+            normalize_to_utc(self.extraction_start, "extraction_start"),
         )
 
         for field_name in ("previous_watermark", "resulting_watermark"):
             value = getattr(self, field_name)
             if value is not None:
-                object.__setattr__(self, field_name, _as_utc(value, field_name))
+                object.__setattr__(
+                    self,
+                    field_name,
+                    normalize_to_utc(value, field_name),
+                )
 
         counters = {
             "rows_received": self.rows_received,
