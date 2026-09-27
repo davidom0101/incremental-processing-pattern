@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 
 
 @dataclass(frozen=True, order=True)
@@ -17,3 +18,19 @@ class RecordVersion:
 
         if self.source_sequence < 0:
             raise ValueError("source_sequence must be non-negative")
+
+
+@dataclass(frozen=True)
+class ProductRecord:
+    """A versioned product received from the source."""
+
+    product_id: str
+    version: RecordVersion
+    name: str
+    category: str
+    price: Decimal
+    is_active: bool
+
+    @property
+    def business_payload(self) -> tuple[str, str, Decimal, bool]:
+        return self.name, self.category, self.price, self.is_active
