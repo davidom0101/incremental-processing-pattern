@@ -14,7 +14,7 @@ def write_source_history(path: Path) -> Path:
     rows = [
         {
             "product_id": "OUTSIDE",
-            "updated_at": "2025-12-31T23:59:59Z",
+            "updated_at": "2025-12-30T10:59:59Z",
             "source_sequence": "1",
             "name": "Old product",
             "category": "Archive",
@@ -133,5 +133,59 @@ def test_initial_load_commits_products_watermark_and_run_metadata(
         0,
         None,
         None,
+    )
+    connection.close()
+
+
+def test_rerunning_source_history_does_not_mutate_products(
+    tmp_path: Path,
+) -> None:
+    connection = duckdb.connect(":memory:")
+    source_path = write_source_history(tmp_path)
+    initial_start = datetime(2026, 1, 1, tzinfo=UTC)
+    overlap = timedelta(hours=24)
+    first_result = run_incremental_load(
+        connection=connection,
+        source_path=source_path,
+        pipeline_name="products",
+        initial_start_at=initial_start,
+        overlap=overlap,
+    )
+    products_before_replay = connection.execute(
+        "SELECT * FROM products_current ORDER BY product_id"
+    ).fetchall()
+
+    replay_result = run_incremental_load(
+        connection=connection,
+        source_path=source_path,
+        pipeline_name="products",
+        initial_start_at=initial_start,
+        overlap=overlap,
+    )
+
+    products_after_replay = connection.execute(
+        "SELECT * FROM products_current ORDER BY product_id"
+    ).fetchall()
+    assert products_after_replay == products_before_replay
+    assert first_result.resulting_watermark is not None
+    assert replay_result.previous_watermark == first_result.resulting_watermark
+    assert replay_result.resulting_watermark == first_result.resulting_watermark
+    assert replay_result.extraction_start == (
+        first_result.resulting_watermark - overlap
+    )
+    assert (
+        replay_result.rows_received,
+        replay_result.rows_after_deduplication,
+        replay_result.rows_inserted,
+        replay_result.rows_updated,
+        replay_result.rows_ignored,
+    ) == (3, 2, 0, 0, 2)
+
+    state = get_pipeline_state(connection, "products")
+    assert state is not None
+    assert state.watermark == first_result.resulting_watermark
+    assert state.last_successful_run_id == replay_result.run_id
+    assert connection.execute("SELECT COUNT(*) FROM pipeline_runs").fetchone() == (
+        2,
     )
     connection.close()
