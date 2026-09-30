@@ -362,6 +362,79 @@ def test_retry_after_failure_produces_expected_state(tmp_path: Path) -> None:
     connection.close()
 
 
+def test_crash_then_retry_matches_clean_incremental_run(tmp_path: Path) -> None:
+    clean_connection = duckdb.connect(":memory:")
+    recovery_connection = duckdb.connect(":memory:")
+    source_path = write_source_history(tmp_path)
+
+    run_products(clean_connection, source_path)
+    run_products(recovery_connection, source_path)
+    append_source_changes(source_path)
+
+    clean_result = run_products(clean_connection, source_path)
+    with pytest.raises(InjectedFailure):
+        run_products(
+            recovery_connection,
+            source_path,
+            failure_point=FailurePoint.AFTER_TARGET_WRITES,
+        )
+    retry_result = run_products(recovery_connection, source_path)
+
+    business_query = """
+        SELECT
+            product_id,
+            updated_at,
+            source_sequence,
+            name,
+            category,
+            price,
+            is_active
+        FROM products_current
+        ORDER BY product_id
+    """
+    assert clean_connection.execute(business_query).fetchall() == (
+        recovery_connection.execute(business_query).fetchall()
+    )
+    assert business_state_checksum(clean_connection) == business_state_checksum(
+        recovery_connection
+    )
+    assert clean_result.resulting_watermark == retry_result.resulting_watermark
+    assert (
+        clean_result.rows_received,
+        clean_result.rows_after_deduplication,
+        clean_result.rows_inserted,
+        clean_result.rows_updated,
+        clean_result.rows_ignored,
+    ) == (
+        retry_result.rows_received,
+        retry_result.rows_after_deduplication,
+        retry_result.rows_inserted,
+        retry_result.rows_updated,
+        retry_result.rows_ignored,
+    )
+
+    clean_state = get_pipeline_state(clean_connection, "products")
+    recovery_state = get_pipeline_state(recovery_connection, "products")
+    assert clean_state is not None
+    assert recovery_state is not None
+    assert clean_state.watermark == recovery_state.watermark
+
+    clean_run_counts = dict(
+        clean_connection.execute(
+            "SELECT status, COUNT(*) FROM pipeline_runs GROUP BY status"
+        ).fetchall()
+    )
+    recovery_run_counts = dict(
+        recovery_connection.execute(
+            "SELECT status, COUNT(*) FROM pipeline_runs GROUP BY status"
+        ).fetchall()
+    )
+    assert clean_run_counts == {"SUCCESS": 2}
+    assert recovery_run_counts == {"SUCCESS": 2, "FAILED": 1}
+    clean_connection.close()
+    recovery_connection.close()
+
+
 def test_mixed_window_applies_late_and_equal_timestamp_updates(
     tmp_path: Path,
 ) -> None:
