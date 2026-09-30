@@ -1,0 +1,6 @@
+product_id,updated_at,source_sequence,name,category,price,is_active
+P006,2026-01-01T12:00:00Z,1,Stainless bottle,Outdoors,24.00,true
+P007,2026-01-01T12:01:00Z,1,Mechanical pencil,Stationery,8.75,true
+P003,2026-01-01T12:02:00Z,2,Desk lamp with USB,Home,42.00,true
+P004,2026-01-01T09:59:00Z,9,Old travel mug,Kitchen,12.00,false
+P003,2026-01-01T12:02:00Z,2,Desk lamp with USB,Home,42.00,true
