@@ -1,0 +1,6 @@
+product_id,updated_at,source_sequence,name,category,price,is_active
+P001,2026-01-01T10:00:00Z,1,Cordless drill,Tools,89.99,true
+P002,2026-01-01T10:01:00Z,1,Circular saw,Tools,129.99,true
+P003,2026-01-01T10:02:00Z,1,Desk lamp,Home,34.50,true
+P004,2026-01-01T10:03:00Z,1,Travel mug,Kitchen,18.00,true
+P005,2026-01-01T10:04:00Z,1,Notebook,Stationery,6.25,true
