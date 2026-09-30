@@ -5,6 +5,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from incremental_pipeline.checksum import business_state_checksum
 from incremental_pipeline.models import RunResult, RunStatus
 from incremental_pipeline.pipeline import (
     FailurePoint,
@@ -202,6 +203,7 @@ def test_rerunning_source_history_does_not_mutate_products(
     connection = duckdb.connect(":memory:")
     source_path = write_source_history(tmp_path)
     first_result = run_products(connection, source_path)
+    checksum_before_replay = business_state_checksum(connection)
     products_before_replay = connection.execute(
         "SELECT * FROM products_current ORDER BY product_id"
     ).fetchall()
@@ -211,6 +213,7 @@ def test_rerunning_source_history_does_not_mutate_products(
     products_after_replay = connection.execute(
         "SELECT * FROM products_current ORDER BY product_id"
     ).fetchall()
+    assert business_state_checksum(connection) == checksum_before_replay
     assert products_after_replay == products_before_replay
     assert first_result.resulting_watermark is not None
     assert replay_result.previous_watermark == first_result.resulting_watermark
