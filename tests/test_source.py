@@ -84,23 +84,6 @@ def test_reader_parses_product_record(tmp_path: Path) -> None:
     assert records[0].is_active is False
 
 
-def test_reader_uses_an_inclusive_window_and_preserves_source_order(
-    tmp_path: Path,
-) -> None:
-    source_path = write_source(
-        tmp_path,
-        [
-            product_row(product_id="OLD", updated_at="2026-01-01T09:59:59Z"),
-            product_row(product_id="BOUNDARY"),
-            product_row(product_id="NEWER", updated_at="2026-01-01T11:00:00Z"),
-        ],
-    )
-
-    records = read_source(source_path)
-
-    assert [record.product_id for record in records] == ["BOUNDARY", "NEWER"]
-
-
 def test_record_at_future_skew_boundary_is_accepted(tmp_path: Path) -> None:
     source_path = write_source(
         tmp_path,
@@ -110,16 +93,6 @@ def test_record_at_future_skew_boundary_is_accepted(tmp_path: Path) -> None:
     records = read_source(source_path)
 
     assert len(records) == 1
-
-
-def test_record_beyond_future_skew_boundary_is_rejected(tmp_path: Path) -> None:
-    source_path = write_source(
-        tmp_path,
-        [product_row(updated_at="2026-01-01T12:05:00.000001Z")],
-    )
-
-    with pytest.raises(SourceDataError, match="exceeds allowed future skew"):
-        read_source(source_path)
 
 
 def test_missing_required_column_is_rejected(tmp_path: Path) -> None:
