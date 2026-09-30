@@ -15,6 +15,13 @@ class LoadCounts:
     ignored: int
 
 
+@dataclass(frozen=True)
+class ProductLoadPlan:
+    inserts: tuple[ProductRecord, ...]
+    updates: tuple[ProductRecord, ...]
+    ignored: int
+
+
 class TargetVersionConflictError(ValueError):
     """Raised when equal source and target versions disagree on payload."""
 
@@ -38,10 +45,21 @@ def load_product_records(
 ) -> LoadCounts:
     """Classify all winners, then apply inserts and updates."""
 
-    if not run_id.strip():
-        raise ValueError("run_id must not be blank")
+    plan = classify_product_records(connection, records)
+    return apply_product_load_plan(
+        connection,
+        plan,
+        run_id=run_id,
+        loaded_at=loaded_at,
+    )
 
-    loaded_at_utc = normalize_to_utc(loaded_at, "loaded_at")
+
+def classify_product_records(
+    connection: duckdb.DuckDBPyConnection,
+    records: Sequence[ProductRecord],
+) -> ProductLoadPlan:
+    """Compare winners with current target state without mutating it."""
+
     target_records = _read_target_records(
         connection,
         [record.product_id for record in records],
@@ -63,7 +81,25 @@ def load_product_records(
         else:
             raise TargetVersionConflictError(record.product_id, record.version)
 
-    if inserts:
+    return ProductLoadPlan(
+        inserts=tuple(inserts),
+        updates=tuple(updates),
+        ignored=ignored,
+    )
+
+
+def apply_product_load_plan(
+    connection: duckdb.DuckDBPyConnection,
+    plan: ProductLoadPlan,
+    *,
+    run_id: str,
+    loaded_at: datetime,
+) -> LoadCounts:
+    if not run_id.strip():
+        raise ValueError("run_id must not be blank")
+
+    loaded_at_utc = normalize_to_utc(loaded_at, "loaded_at")
+    if plan.inserts:
         connection.executemany(
             """
             INSERT INTO products_current (
@@ -81,11 +117,11 @@ def load_product_records(
             """,
             [
                 _write_values(record, run_id, loaded_at_utc)
-                for record in inserts
+                for record in plan.inserts
             ],
         )
 
-    if updates:
+    if plan.updates:
         connection.executemany(
             """
             UPDATE products_current
@@ -102,14 +138,14 @@ def load_product_records(
             """,
             [
                 _update_values(record, run_id, loaded_at_utc)
-                for record in updates
+                for record in plan.updates
             ],
         )
 
     return LoadCounts(
-        inserted=len(inserts),
-        updated=len(updates),
-        ignored=ignored,
+        inserted=len(plan.inserts),
+        updated=len(plan.updates),
+        ignored=plan.ignored,
     )
 
 
