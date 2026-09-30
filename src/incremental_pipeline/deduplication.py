@@ -22,6 +22,7 @@ def deduplicate_records(
 ) -> list[ProductRecord]:
     """Reject ambiguous versions and return one latest record per product."""
 
+    # Conflicting old versions still make the source batch ambiguous.
     records_by_version: dict[tuple[str, RecordVersion], ProductRecord] = {}
     winners_by_product: dict[str, ProductRecord] = {}
 

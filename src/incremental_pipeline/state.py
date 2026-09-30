@@ -31,6 +31,8 @@ def save_pipeline_state(
     connection: duckdb.DuckDBPyConnection,
     state: PipelineState,
 ) -> None:
+    """Upsert state without committing the caller's transaction."""
+
     connection.execute(
         """
         INSERT INTO pipeline_state (

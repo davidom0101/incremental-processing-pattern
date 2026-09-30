@@ -47,6 +47,7 @@ def read_records_since(
             updated_at = _parse_timestamp(row.get("updated_at"), row_number)
             if updated_at < extraction_start:
                 continue
+            # Reject future outliers before they can push the watermark forward.
             if updated_at > latest_allowed_timestamp:
                 raise SourceDataError(
                     f"row {row_number}: updated_at exceeds allowed future skew"

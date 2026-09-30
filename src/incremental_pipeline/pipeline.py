@@ -81,6 +81,7 @@ def run_incremental_load(
             previous_watermark,
             source_watermark,
         )
+        # V1 is single-writer, so conflicts can be found before anything changes.
         load_plan = classify_product_records(connection, winners)
         _inject_failure(failure_point, FailurePoint.AFTER_CLASSIFICATION)
 
@@ -130,6 +131,7 @@ def run_incremental_load(
                 error.add_note(f"rollback also failed: {rollback_error}")
 
         try:
+            # Record this after rollback so the failure is not rolled back too.
             _insert_run_record(
                 connection=connection,
                 run_id=run_id,

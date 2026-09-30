@@ -77,6 +77,7 @@ def classify_product_records(
         elif record.version < target_record.version:
             ignored += 1
         elif record.business_payload == target_record.business_payload:
+            # Leave replays untouched so their load metadata does not change.
             ignored += 1
         else:
             raise TargetVersionConflictError(record.product_id, record.version)
