@@ -9,7 +9,12 @@ import duckdb
 
 from incremental_pipeline.checksum import business_state_checksum
 from incremental_pipeline.models import RunResult
-from incremental_pipeline.pipeline import run_incremental_load
+from incremental_pipeline.pipeline import (
+    FailurePoint,
+    InjectedFailure,
+    run_incremental_load,
+)
+from incremental_pipeline.state import get_pipeline_state
 
 PIPELINE_NAME = "products"
 INITIAL_START_AT = datetime(2026, 1, 1, tzinfo=UTC)
@@ -21,6 +26,7 @@ CHANGES_DIRECTORY = Path(__file__).parent / "source" / "changes"
 def run_products(
     connection: duckdb.DuckDBPyConnection,
     source_path: Path,
+    failure_point: FailurePoint | None = None,
 ) -> RunResult:
     """Run the product pipeline with the demo settings."""
 
@@ -30,6 +36,7 @@ def run_products(
         pipeline_name=PIPELINE_NAME,
         initial_start_at=INITIAL_START_AT,
         overlap=OVERLAP,
+        failure_point=failure_point,
     )
 
 
@@ -205,6 +212,95 @@ def main() -> None:
             ]
             if products_after_mixed_run != expected_products:
                 raise RuntimeError("mixed run did not produce the expected products")
+
+            products_before_failure = connection.execute(
+                "SELECT * FROM products_current ORDER BY product_id"
+            ).fetchall()
+            state_before_failure = get_pipeline_state(connection, PIPELINE_NAME)
+            checksum_before_failure = business_state_checksum(connection)
+            successful_runs_before_failure = connection.execute(
+                "SELECT COUNT(*) FROM pipeline_runs WHERE status = 'SUCCESS'"
+            ).fetchone()[0]
+            append_fixture(
+                source_path,
+                CHANGES_DIRECTORY / "run_05_retry.csv",
+            )
+
+            try:
+                run_products(
+                    connection,
+                    source_path,
+                    failure_point=FailurePoint.AFTER_TARGET_WRITES,
+                )
+            except InjectedFailure as error:
+                print("Run 5: injected failure")
+                print(f"  status=FAILED error={type(error).__name__}")
+            else:
+                raise RuntimeError("injected failure did not stop the run")
+
+            # Target changes, state and success metadata must roll back together.
+            if connection.execute(
+                "SELECT * FROM products_current ORDER BY product_id"
+            ).fetchall() != products_before_failure:
+                raise RuntimeError("failed run changed the target")
+            if get_pipeline_state(connection, PIPELINE_NAME) != state_before_failure:
+                raise RuntimeError("failed run changed the watermark state")
+            if business_state_checksum(connection) != checksum_before_failure:
+                raise RuntimeError("failed run changed the business state")
+            successful_runs_after_failure = connection.execute(
+                "SELECT COUNT(*) FROM pipeline_runs WHERE status = 'SUCCESS'"
+            ).fetchone()[0]
+            if successful_runs_after_failure != successful_runs_before_failure:
+                raise RuntimeError("failed run left success metadata behind")
+            failed_run = connection.execute(
+                """
+                SELECT status, resulting_watermark, error_type
+                FROM pipeline_runs
+                WHERE status = 'FAILED'
+                """
+            ).fetchone()
+            if failed_run != ("FAILED", None, "InjectedFailure"):
+                raise RuntimeError("failed run metadata was not recorded correctly")
+            print("  target_unchanged=true watermark_unchanged=true")
+
+            # Retry the unchanged history so recovery does not depend on repair work.
+            restart_result = run_products(connection, source_path)
+            restart_checksum = business_state_checksum(connection)
+            print_run("Run 6: safe restart", restart_result, restart_checksum)
+            expect_counts(restart_result, (14, 8, 1, 1, 6))
+
+            restarted_products = connection.execute(
+                """
+                SELECT product_id, name, source_sequence, last_run_id
+                FROM products_current
+                WHERE product_id IN ('P002', 'P008')
+                ORDER BY product_id
+                """
+            ).fetchall()
+            if restarted_products != [
+                ("P002", "Circular saw bundle", 3, restart_result.run_id),
+                ("P008", "Camping lantern", 1, restart_result.run_id),
+            ]:
+                raise RuntimeError("restart did not apply the expected changes")
+
+            final_state = get_pipeline_state(connection, PIPELINE_NAME)
+            if final_state is None or final_state.watermark != datetime(
+                2026,
+                1,
+                1,
+                13,
+                1,
+                tzinfo=UTC,
+            ):
+                raise RuntimeError("restart did not advance the watermark")
+
+            run_counts = dict(
+                connection.execute(
+                    "SELECT status, COUNT(*) FROM pipeline_runs GROUP BY status"
+                ).fetchall()
+            )
+            if run_counts != {"SUCCESS": 5, "FAILED": 1}:
+                raise RuntimeError("demo run history is incomplete")
         finally:
             connection.close()
 
