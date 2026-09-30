@@ -7,6 +7,8 @@ class ConflictingSourceVersionError(ValueError):
     """Raised when one source version has more than one business payload."""
 
     def __init__(self, product_id: str, version: RecordVersion) -> None:
+        """Describe the ambiguous source version."""
+
         self.product_id = product_id
         self.version = version
         super().__init__(
@@ -36,6 +38,7 @@ def deduplicate_records(
                     product_id=record.product_id,
                     version=record.version,
                 )
+            # Exact repeats are safe because they carry no competing information.
             continue
 
         records_by_version[identity] = record
@@ -43,6 +46,7 @@ def deduplicate_records(
         if current_winner is None or record.version > current_winner.version:
             winners_by_product[record.product_id] = record
 
+    # Stable output keeps downstream writes independent of source row order.
     return [
         winners_by_product[product_id]
         for product_id in sorted(winners_by_product)

@@ -26,6 +26,8 @@ class TargetVersionConflictError(ValueError):
     """Raised when equal source and target versions disagree on payload."""
 
     def __init__(self, product_id: str, version: RecordVersion) -> None:
+        """Describe the source and target version conflict."""
+
         self.product_id = product_id
         self.version = version
         super().__init__(
@@ -68,6 +70,7 @@ def classify_product_records(
     updates: list[ProductRecord] = []
     ignored = 0
 
+    # Complete classification first so a conflict cannot follow partial writes.
     for record in records:
         target_record = target_records.get(record.product_id)
         if target_record is None:
@@ -75,6 +78,7 @@ def classify_product_records(
         elif record.version > target_record.version:
             updates.append(record)
         elif record.version < target_record.version:
+            # A late stale winner must never move the target backwards.
             ignored += 1
         elif record.business_payload == target_record.business_payload:
             # Leave replays untouched so their load metadata does not change.
@@ -96,6 +100,8 @@ def apply_product_load_plan(
     run_id: str,
     loaded_at: datetime,
 ) -> LoadCounts:
+    """Write a previously classified product load plan."""
+
     if not run_id.strip():
         raise ValueError("run_id must not be blank")
 
@@ -154,6 +160,8 @@ def _read_target_records(
     connection: duckdb.DuckDBPyConnection,
     product_ids: list[str],
 ) -> dict[str, ProductRecord]:
+    """Read target records for the requested product keys."""
+
     if not product_ids:
         return {}
 
@@ -195,6 +203,8 @@ def _write_values(
     run_id: str,
     loaded_at: datetime,
 ) -> tuple[object, ...]:
+    """Build values for a product insert."""
+
     return (
         record.product_id,
         record.version.updated_at,
@@ -213,4 +223,7 @@ def _update_values(
     run_id: str,
     loaded_at: datetime,
 ) -> tuple[object, ...]:
+    """Build values for a product update."""
+
+    # The update uses the insert payload order but places the key last for WHERE.
     return (*_write_values(record, run_id, loaded_at)[1:], record.product_id)

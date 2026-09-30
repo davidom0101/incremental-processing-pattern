@@ -27,6 +27,7 @@ def canonical_business_state(
         """
     ).fetchall()
 
+    # Python ordering follows the Unicode ordering required by the checksum.
     lines = (
         _canonical_product_line(row)
         for row in sorted(rows, key=lambda row: row[0])
@@ -43,12 +44,15 @@ def business_state_checksum(
 
 
 def _canonical_product_line(row: tuple[object, ...]) -> bytes:
+    """Encode one product as a canonical JSON Lines record."""
+
     product_id, updated_at, source_sequence, name, category, price, is_active = row
     if not isinstance(updated_at, datetime):
         raise TypeError("updated_at must be a datetime")
     if not isinstance(price, Decimal):
         raise TypeError("price must be a Decimal")
 
+    # Field insertion order and JSON settings below are part of the byte contract.
     payload = {
         "product_id": product_id,
         "updated_at": normalize_to_utc(updated_at, "updated_at").strftime(

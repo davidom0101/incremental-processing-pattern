@@ -22,6 +22,8 @@ from incremental_pipeline.windowing import calculate_extraction_start
 
 
 class FailurePoint(StrEnum):
+    """Test seams placed around the transaction boundaries."""
+
     AFTER_CLASSIFICATION = "after_classification"
     AFTER_TARGET_WRITES = "after_target_writes"
     AFTER_STATE_ADVANCEMENT = "after_state_advancement"
@@ -47,11 +49,13 @@ def run_incremental_load(
 
     initialize_database(connection)
     run_id = str(uuid4())
+    # One timestamp anchors future validation and load metadata for this run.
     run_started_at = datetime.now(UTC)
     previous_watermark: datetime | None = None
     records_received = 0
     records_after_deduplication = 0
     counts = LoadCounts(inserted=0, updated=0, ignored=0)
+    # Failures before BEGIN still need audit metadata but do not need rollback.
     transaction_active = False
 
     try:
@@ -73,6 +77,7 @@ def run_incremental_load(
         records_received = len(records)
         winners = deduplicate_records(records)
         records_after_deduplication = len(winners)
+        # Source progress includes valid rows that later lose during deduplication.
         source_watermark = max(
             (record.version.updated_at for record in records),
             default=None,
@@ -81,7 +86,7 @@ def run_incremental_load(
             previous_watermark,
             source_watermark,
         )
-        # V1 is single-writer, so conflicts can be found before anything changes.
+        # V1 has one writer, so conflicts can be found before anything changes.
         load_plan = classify_product_records(connection, winners)
         _inject_failure(failure_point, FailurePoint.AFTER_CLASSIFICATION)
 
@@ -97,6 +102,7 @@ def run_incremental_load(
         finished_at = datetime.now(UTC)
 
         if resulting_watermark is not None:
+            # An empty first run has no source position to persist.
             save_pipeline_state(
                 connection,
                 PipelineState(
@@ -105,9 +111,10 @@ def run_incremental_load(
                     last_successful_run_id=run_id,
                     updated_at=finished_at,
                 ),
-            )
+        )
         _inject_failure(failure_point, FailurePoint.AFTER_STATE_ADVANCEMENT)
 
+        # Success metadata commits with the target and watermark.
         _insert_run_record(
             connection=connection,
             run_id=run_id,
@@ -124,6 +131,7 @@ def run_incremental_load(
         connection.execute("COMMIT")
         transaction_active = False
     except Exception as error:
+        # Keep the original pipeline error primary if cleanup also fails.
         if transaction_active:
             try:
                 connection.execute("ROLLBACK")
@@ -169,6 +177,8 @@ def _inject_failure(
     requested: FailurePoint | None,
     current: FailurePoint,
 ) -> None:
+    """Raise when the requested test failure point is reached."""
+
     if requested is current:
         raise InjectedFailure(f"failure injected at {current.value}")
 
@@ -188,6 +198,8 @@ def _insert_run_record(
     counts: LoadCounts,
     error: Exception | None = None,
 ) -> None:
+    """Persist one success or failure audit record."""
+
     connection.execute(
         """
         INSERT INTO pipeline_runs (
@@ -231,6 +243,8 @@ def _advance_watermark(
     previous_watermark: datetime | None,
     source_watermark: datetime | None,
 ) -> datetime | None:
+    """Advance without allowing the watermark to decrease."""
+
     if previous_watermark is None:
         return source_watermark
     if source_watermark is None:

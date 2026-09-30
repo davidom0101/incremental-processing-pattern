@@ -14,6 +14,8 @@ class RecordVersion:
     source_sequence: int
 
     def __post_init__(self) -> None:
+        """Normalize and validate the version coordinates."""
+
         object.__setattr__(
             self,
             "updated_at",
@@ -37,6 +39,8 @@ class ProductRecord:
 
     @property
     def business_payload(self) -> tuple[str, str, Decimal, bool]:
+        """Return the fields used to distinguish replays from conflicts."""
+
         return self.name, self.category, self.price, self.is_active
 
 
@@ -50,6 +54,8 @@ class PipelineState:
     updated_at: datetime
 
     def __post_init__(self) -> None:
+        """Normalize the stored state timestamps."""
+
         object.__setattr__(
             self,
             "watermark",
@@ -84,6 +90,8 @@ class RunResult:
     rows_ignored: int
 
     def __post_init__(self) -> None:
+        """Normalize timestamps and enforce result invariants."""
+
         if not isinstance(self.status, RunStatus):
             raise ValueError("status must be a RunStatus")
 
@@ -126,6 +134,7 @@ class RunResult:
         rows_classified = (
             self.rows_inserted + self.rows_updated + self.rows_ignored
         )
+        # Every deduplicated winner has exactly one load outcome on success.
         if (
             self.status is RunStatus.SUCCESS
             and rows_classified != self.rows_after_deduplication

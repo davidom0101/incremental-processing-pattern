@@ -7,6 +7,8 @@ def get_pipeline_state(
     connection: duckdb.DuckDBPyConnection,
     pipeline_name: str,
 ) -> PipelineState | None:
+    """Return the last successful state for a pipeline."""
+
     row = connection.execute(
         """
         SELECT pipeline_name, watermark, last_successful_run_id, updated_at

@@ -31,6 +31,8 @@ def read_records_since(
     run_started_at: datetime,
     allowed_future_skew: timedelta = DEFAULT_ALLOWED_FUTURE_SKEW,
 ) -> list[ProductRecord]:
+    """Read valid source records inside the extraction window."""
+
     extraction_start = normalize_to_utc(updated_at_gte, "updated_at_gte")
     run_start = normalize_to_utc(run_started_at, "run_started_at")
     if allowed_future_skew < timedelta(0):
@@ -45,6 +47,7 @@ def read_records_since(
 
         for row_number, row in enumerate(reader, start=2):
             updated_at = _parse_timestamp(row.get("updated_at"), row_number)
+            # Payload outside the window is irrelevant, so only parse its timestamp.
             if updated_at < extraction_start:
                 continue
             # Reject future outliers before they can push the watermark forward.
@@ -59,6 +62,8 @@ def read_records_since(
 
 
 def _validate_header(fieldnames: list[str] | None) -> None:
+    """Require the columns used by the product source contract."""
+
     if fieldnames is None:
         raise SourceDataError("source file must contain a header row")
 
@@ -73,6 +78,8 @@ def _parse_record(
     row_number: int,
     updated_at: datetime,
 ) -> ProductRecord:
+    """Parse one selected CSV row into a product record."""
+
     product_id = _required_text(row, "product_id", row_number)
     name = _required_text(row, "name", row_number)
     category = _required_text(row, "category", row_number)
@@ -95,6 +102,8 @@ def _required_text(
     field_name: str,
     row_number: int,
 ) -> str:
+    """Return a required text field after trimming it."""
+
     value = row.get(field_name)
     if value is None or not value.strip():
         raise SourceDataError(f"row {row_number}: {field_name} must not be blank")
@@ -103,6 +112,8 @@ def _required_text(
 
 
 def _parse_timestamp(value: str | None, row_number: int) -> datetime:
+    """Parse one source timestamp and normalize it to UTC."""
+
     if value is None or not value.strip():
         raise SourceDataError(f"row {row_number}: updated_at must not be blank")
 
@@ -119,6 +130,8 @@ def _parse_timestamp(value: str | None, row_number: int) -> datetime:
 
 
 def _parse_sequence(value: str | None, row_number: int) -> int:
+    """Parse a nonnegative source sequence."""
+
     if value is None or not value.strip():
         raise SourceDataError(f"row {row_number}: source_sequence must not be blank")
 
@@ -138,6 +151,8 @@ def _parse_sequence(value: str | None, row_number: int) -> int:
 
 
 def _parse_price(value: str | None, row_number: int) -> Decimal:
+    """Parse a price that fits the target decimal contract."""
+
     if value is None or not value.strip():
         raise SourceDataError(f"row {row_number}: price must not be blank")
 
@@ -167,6 +182,8 @@ def _parse_price(value: str | None, row_number: int) -> Decimal:
 
 
 def _parse_boolean(value: str | None, row_number: int) -> bool:
+    """Parse the accepted source boolean values."""
+
     if value is None:
         raise SourceDataError(f"row {row_number}: is_active must not be blank")
 

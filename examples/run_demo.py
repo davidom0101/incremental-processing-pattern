@@ -22,6 +22,8 @@ def run_products(
     connection: duckdb.DuckDBPyConnection,
     source_path: Path,
 ) -> RunResult:
+    """Run the product pipeline with the demo settings."""
+
     return run_incremental_load(
         connection=connection,
         source_path=source_path,
@@ -32,6 +34,8 @@ def run_products(
 
 
 def print_run(label: str, result: RunResult, checksum: str) -> None:
+    """Print one demo run summary."""
+
     print(label)
     print(
         "  received={0.rows_received} deduplicated={0.rows_after_deduplication} "
@@ -43,6 +47,8 @@ def print_run(label: str, result: RunResult, checksum: str) -> None:
 
 
 def append_fixture(source_path: Path, fixture_path: Path) -> None:
+    """Append one change fragment to the accumulated source history."""
+
     with fixture_path.open(newline="", encoding="utf-8") as fixture_file:
         reader = csv.DictReader(fixture_file)
         with source_path.open("a", newline="", encoding="utf-8") as source_file:
@@ -51,6 +57,8 @@ def append_fixture(source_path: Path, fixture_path: Path) -> None:
 
 
 def expect_counts(result: RunResult, expected: tuple[int, int, int, int, int]) -> None:
+    """Fail when a demo run returns unexpected counters."""
+
     actual = (
         result.rows_received,
         result.rows_after_deduplication,
@@ -63,19 +71,23 @@ def expect_counts(result: RunResult, expected: tuple[int, int, int, int, int]) -
 
 
 def main() -> None:
+    """Run the deterministic processing demonstration."""
+
     with TemporaryDirectory() as temporary_directory:
         working_directory = Path(temporary_directory)
         source_path = working_directory / "products.csv"
+        # Work on a copy because later runs append to the same source history.
         copyfile(INITIAL_SOURCE, source_path)
 
         connection = duckdb.connect(str(working_directory / "demo.duckdb"))
         try:
             initial_result = run_products(connection, source_path)
             initial_checksum = business_state_checksum(connection)
+            # Full rows expose accidental changes to operational metadata on replay.
             products_after_initial = connection.execute(
                 "SELECT * FROM products_current ORDER BY product_id"
             ).fetchall()
-            print_run("Run 1 - initial load", initial_result, initial_checksum)
+            print_run("Run 1: initial load", initial_result, initial_checksum)
             expect_counts(initial_result, (5, 5, 5, 0, 0))
 
             replay_result = run_products(connection, source_path)
@@ -83,21 +95,22 @@ def main() -> None:
             products_after_replay = connection.execute(
                 "SELECT * FROM products_current ORDER BY product_id"
             ).fetchall()
-            print_run("Run 2 - exact replay", replay_result, replay_checksum)
+            print_run("Run 2: exact replay", replay_result, replay_checksum)
             expect_counts(replay_result, (5, 5, 0, 0, 5))
 
             if replay_checksum != initial_checksum:
-                raise RuntimeError("replay changed the business-state checksum")
+                raise RuntimeError("replay changed the business state checksum")
             if products_after_replay != products_after_initial:
                 raise RuntimeError("replay changed target rows or load metadata")
 
+            # Each run reads all accumulated history, not only the new fragment.
             append_fixture(
                 source_path,
                 CHANGES_DIRECTORY / "run_03_updates.csv",
             )
             update_result = run_products(connection, source_path)
             update_checksum = business_state_checksum(connection)
-            print_run("Run 3 - legitimate updates", update_result, update_checksum)
+            print_run("Run 3: legitimate updates", update_result, update_checksum)
             expect_counts(update_result, (7, 5, 0, 2, 3))
 
             append_fixture(
@@ -106,7 +119,8 @@ def main() -> None:
             )
             mixed_result = run_products(connection, source_path)
             mixed_checksum = business_state_checksum(connection)
-            print_run("Run 4 - mixed changes", mixed_result, mixed_checksum)
+            print_run("Run 4: mixed changes", mixed_result, mixed_checksum)
+            # The stale row and duplicate lose during deduplication, not loading.
             expect_counts(mixed_result, (12, 7, 2, 1, 4))
 
             products_after_mixed_run = connection.execute(
@@ -123,6 +137,7 @@ def main() -> None:
                 ORDER BY product_id
                 """
             ).fetchall()
+            # This expected table proves content independently of the checksum.
             expected_products = [
                 (
                     "P001",

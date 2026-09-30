@@ -1,5 +1,6 @@
 import duckdb
 
+# Keep cheap invariants in DuckDB so direct writes cannot bypass them.
 SCHEMA_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS products_current (
@@ -53,5 +54,7 @@ SCHEMA_STATEMENTS = (
 
 
 def initialize_database(connection: duckdb.DuckDBPyConnection) -> None:
+    """Create the pipeline tables when they do not exist."""
+
     for statement in SCHEMA_STATEMENTS:
         connection.execute(statement)
