@@ -12,6 +12,9 @@ dependencies = [
     "pytz>=2026.4,<2027",
 ]
 
+[project.scripts]
+incremental-processing = "incremental_pipeline.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8,<9",
