@@ -32,7 +32,7 @@ DuckDB stores the target data, watermark and run history. Successful target chan
 
 ## Getting started
 
-The project supports Python 3.11 through 3.13.
+The project uses Python 3.13.
 
 ```powershell
 git clone https://github.com/davidom0101/incremental-processing-pattern.git
