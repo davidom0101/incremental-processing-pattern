@@ -111,7 +111,7 @@ def run_incremental_load(
                     last_successful_run_id=run_id,
                     updated_at=finished_at,
                 ),
-        )
+            )
         _inject_failure(failure_point, FailurePoint.AFTER_STATE_ADVANCEMENT)
 
         # Success metadata commits with the target and watermark.

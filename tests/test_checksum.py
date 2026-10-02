@@ -46,7 +46,7 @@ def test_business_state_uses_canonical_json_lines() -> None:
         '{"product_id":"Pé","updated_at":"2026-01-02T03:04:05.600000Z",'
         '"source_sequence":2,"name":"Café","category":"Kitchen",'
         '"price":"19.90","is_active":true}\n'
-    ).encode("utf-8")
+    ).encode()
 
     assert canonical_business_state(connection) == expected
     assert business_state_checksum(connection) == hashlib.sha256(expected).hexdigest()

@@ -45,11 +45,17 @@ def print_run(label: str, result: RunResult, checksum: str) -> None:
 
     print(label)
     print(
-        "  received={0.rows_received} deduplicated={0.rows_after_deduplication} "
-        "inserted={0.rows_inserted} updated={0.rows_updated} "
-        "ignored={0.rows_ignored}".format(result)
+        f"  received={result.rows_received} "
+        f"deduplicated={result.rows_after_deduplication} "
+        f"inserted={result.rows_inserted} updated={result.rows_updated} "
+        f"ignored={result.rows_ignored}"
     )
-    print(f"  watermark={result.resulting_watermark.isoformat()}")
+    watermark = (
+        result.resulting_watermark.isoformat()
+        if result.resulting_watermark is not None
+        else None
+    )
+    print(f"  watermark={watermark}")
     print(f"  checksum={checksum}")
 
 
@@ -58,6 +64,8 @@ def append_fixture(source_path: Path, fixture_path: Path) -> None:
 
     with fixture_path.open(newline="", encoding="utf-8") as fixture_file:
         reader = csv.DictReader(fixture_file)
+        if reader.fieldnames is None:
+            raise RuntimeError(f"fixture has no header: {fixture_path}")
         with source_path.open("a", newline="", encoding="utf-8") as source_file:
             writer = csv.DictWriter(source_file, fieldnames=reader.fieldnames)
             writer.writerows(reader)
@@ -75,6 +83,21 @@ def expect_counts(result: RunResult, expected: tuple[int, int, int, int, int]) -
     )
     if actual != expected:
         raise RuntimeError(f"unexpected counters: expected {expected}, got {actual}")
+
+
+def count_runs(
+    connection: duckdb.DuckDBPyConnection,
+    status: str,
+) -> int:
+    """Count persisted runs with the requested status."""
+
+    row = connection.execute(
+        "SELECT COUNT(*) FROM pipeline_runs WHERE status = ?",
+        [status],
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("run count query returned no row")
+    return int(row[0])
 
 
 def main() -> None:
@@ -218,9 +241,7 @@ def main() -> None:
             ).fetchall()
             state_before_failure = get_pipeline_state(connection, PIPELINE_NAME)
             checksum_before_failure = business_state_checksum(connection)
-            successful_runs_before_failure = connection.execute(
-                "SELECT COUNT(*) FROM pipeline_runs WHERE status = 'SUCCESS'"
-            ).fetchone()[0]
+            successful_runs_before_failure = count_runs(connection, "SUCCESS")
             append_fixture(
                 source_path,
                 CHANGES_DIRECTORY / "run_05_retry.csv",
@@ -239,17 +260,18 @@ def main() -> None:
                 raise RuntimeError("injected failure did not stop the run")
 
             # Target changes, state and success metadata must roll back together.
-            if connection.execute(
-                "SELECT * FROM products_current ORDER BY product_id"
-            ).fetchall() != products_before_failure:
+            if (
+                connection.execute(
+                    "SELECT * FROM products_current ORDER BY product_id"
+                ).fetchall()
+                != products_before_failure
+            ):
                 raise RuntimeError("failed run changed the target")
             if get_pipeline_state(connection, PIPELINE_NAME) != state_before_failure:
                 raise RuntimeError("failed run changed the watermark state")
             if business_state_checksum(connection) != checksum_before_failure:
                 raise RuntimeError("failed run changed the business state")
-            successful_runs_after_failure = connection.execute(
-                "SELECT COUNT(*) FROM pipeline_runs WHERE status = 'SUCCESS'"
-            ).fetchone()[0]
+            successful_runs_after_failure = count_runs(connection, "SUCCESS")
             if successful_runs_after_failure != successful_runs_before_failure:
                 raise RuntimeError("failed run left success metadata behind")
             failed_run = connection.execute(

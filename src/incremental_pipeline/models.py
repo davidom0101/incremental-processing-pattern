@@ -127,21 +127,16 @@ class RunResult:
                 raise ValueError(f"{field_name} must be non-negative")
 
         if self.rows_after_deduplication > self.rows_received:
-            raise ValueError(
-                "rows_after_deduplication cannot exceed rows_received"
-            )
+            raise ValueError("rows_after_deduplication cannot exceed rows_received")
 
-        rows_classified = (
-            self.rows_inserted + self.rows_updated + self.rows_ignored
-        )
+        rows_classified = self.rows_inserted + self.rows_updated + self.rows_ignored
         # Every deduplicated winner has exactly one load outcome on success.
         if (
             self.status is RunStatus.SUCCESS
             and rows_classified != self.rows_after_deduplication
         ):
             raise ValueError(
-                "successful run counters must reconcile with "
-                "rows_after_deduplication"
+                "successful run counters must reconcile with rows_after_deduplication"
             )
 
         if self.status is RunStatus.FAILED and self.resulting_watermark is not None:

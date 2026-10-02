@@ -1,4 +1,5 @@
 import csv
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -61,7 +62,7 @@ def read_records_since(
     return records
 
 
-def _validate_header(fieldnames: list[str] | None) -> None:
+def _validate_header(fieldnames: Sequence[str] | None) -> None:
     """Require the columns used by the product source contract."""
 
     if fieldnames is None:
@@ -143,9 +144,7 @@ def _parse_sequence(value: str | None, row_number: int) -> int:
         ) from error
 
     if sequence < 0:
-        raise SourceDataError(
-            f"row {row_number}: source_sequence must be non-negative"
-        )
+        raise SourceDataError(f"row {row_number}: source_sequence must be non-negative")
 
     return sequence
 
@@ -193,6 +192,4 @@ def _parse_boolean(value: str | None, row_number: int) -> bool:
     if normalized_value == "false":
         return False
 
-    raise SourceDataError(
-        f"row {row_number}: is_active must be either true or false"
-    )
+    raise SourceDataError(f"row {row_number}: is_active must be either true or false")

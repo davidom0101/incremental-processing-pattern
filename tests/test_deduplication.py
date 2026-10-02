@@ -71,9 +71,7 @@ def test_conflicting_payloads_fail_even_when_version_is_not_the_winner() -> None
     )
 
     with pytest.raises(ConflictingSourceVersionError) as error:
-        deduplicate_records(
-            [newer_version, old_version, conflicting_old_version]
-        )
+        deduplicate_records([newer_version, old_version, conflicting_old_version])
 
     assert error.value.product_id == "P001"
     assert error.value.version == old_version.version

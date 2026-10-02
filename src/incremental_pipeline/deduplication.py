@@ -47,7 +47,4 @@ def deduplicate_records(
             winners_by_product[record.product_id] = record
 
     # Stable output keeps downstream writes independent of source row order.
-    return [
-        winners_by_product[product_id]
-        for product_id in sorted(winners_by_product)
-    ]
+    return [winners_by_product[product_id] for product_id in sorted(winners_by_product)]

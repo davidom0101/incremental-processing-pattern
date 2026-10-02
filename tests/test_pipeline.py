@@ -134,9 +134,7 @@ def test_initial_load_commits_products_watermark_and_run_metadata(
     assert result.status is RunStatus.SUCCESS
     assert result.previous_watermark is None
     assert result.extraction_start == INITIAL_START_AT
-    assert result.resulting_watermark == datetime(
-        2026, 1, 1, 11, 0, tzinfo=UTC
-    )
+    assert result.resulting_watermark == datetime(2026, 1, 1, 11, 0, tzinfo=UTC)
     assert (
         result.rows_received,
         result.rows_after_deduplication,
@@ -233,9 +231,7 @@ def test_rerunning_source_history_does_not_mutate_products(
     assert state is not None
     assert state.watermark == first_result.resulting_watermark
     assert state.last_successful_run_id == replay_result.run_id
-    assert connection.execute("SELECT COUNT(*) FROM pipeline_runs").fetchone() == (
-        2,
-    )
+    assert connection.execute("SELECT COUNT(*) FROM pipeline_runs").fetchone() == (2,)
     connection.close()
 
 
@@ -334,9 +330,7 @@ def test_retry_after_failure_produces_expected_state(tmp_path: Path) -> None:
         retry_result.rows_updated,
         retry_result.rows_ignored,
     ) == (5, 3, 1, 1, 1)
-    assert retry_result.resulting_watermark == datetime(
-        2026, 1, 1, 12, 0, tzinfo=UTC
-    )
+    assert retry_result.resulting_watermark == datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
     products = connection.execute(
         """
         SELECT product_id, name, last_run_id
@@ -482,9 +476,7 @@ def test_mixed_window_applies_late_and_equal_timestamp_updates(
         overlap=timedelta(minutes=30),
     )
 
-    assert result.extraction_start == datetime(
-        2026, 1, 1, 10, 30, tzinfo=UTC
-    )
+    assert result.extraction_start == datetime(2026, 1, 1, 10, 30, tzinfo=UTC)
     assert (
         result.rows_received,
         result.rows_after_deduplication,
@@ -528,9 +520,12 @@ def test_empty_extraction_keeps_the_successful_watermark(tmp_path: Path) -> None
         empty_result.rows_ignored,
     ) == (0, 0, 0, 0, 0)
     assert empty_result.resulting_watermark == initial_result.resulting_watermark
-    assert connection.execute(
-        "SELECT * FROM products_current ORDER BY product_id"
-    ).fetchall() == products_before_empty_run
+    assert (
+        connection.execute(
+            "SELECT * FROM products_current ORDER BY product_id"
+        ).fetchall()
+        == products_before_empty_run
+    )
     state = get_pipeline_state(connection, "products")
     assert state is not None
     assert state.watermark == initial_result.resulting_watermark
@@ -564,9 +559,12 @@ def test_future_timestamp_cannot_poison_the_watermark(tmp_path: Path) -> None:
     with pytest.raises(SourceDataError, match="allowed future skew"):
         run_products(connection, source_path)
 
-    assert connection.execute(
-        "SELECT * FROM products_current ORDER BY product_id"
-    ).fetchall() == products_before_failure
+    assert (
+        connection.execute(
+            "SELECT * FROM products_current ORDER BY product_id"
+        ).fetchall()
+        == products_before_failure
+    )
     assert get_pipeline_state(connection, "products") == state_before_failure
     assert state_before_failure is not None
     assert state_before_failure.watermark == initial_result.resulting_watermark

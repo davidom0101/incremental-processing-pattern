@@ -122,10 +122,7 @@ def apply_product_load_plan(
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            [
-                _write_values(record, run_id, loaded_at_utc)
-                for record in plan.inserts
-            ],
+            [_write_values(record, run_id, loaded_at_utc) for record in plan.inserts],
         )
 
     if plan.updates:
@@ -143,10 +140,7 @@ def apply_product_load_plan(
                 last_run_id = ?
             WHERE product_id = ?
             """,
-            [
-                _update_values(record, run_id, loaded_at_utc)
-                for record in plan.updates
-            ],
+            [_update_values(record, run_id, loaded_at_utc) for record in plan.updates],
         )
 
     return LoadCounts(

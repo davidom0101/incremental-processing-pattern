@@ -29,8 +29,7 @@ def canonical_business_state(
 
     # Python ordering follows the Unicode ordering required by the checksum.
     lines = (
-        _canonical_product_line(row)
-        for row in sorted(rows, key=lambda row: row[0])
+        _canonical_product_line(row) for row in sorted(rows, key=lambda row: row[0])
     )
     return b"".join(lines)
 

@@ -77,9 +77,7 @@ def test_reader_parses_product_record(tmp_path: Path) -> None:
 
     assert len(records) == 1
     assert records[0].product_id == "P001"
-    assert records[0].version.updated_at == datetime(
-        2026, 1, 1, 10, 0, tzinfo=UTC
-    )
+    assert records[0].version.updated_at == datetime(2026, 1, 1, 10, 0, tzinfo=UTC)
     assert records[0].price == Decimal("89.90")
     assert records[0].is_active is False
 

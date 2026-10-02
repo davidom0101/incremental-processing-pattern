@@ -18,10 +18,7 @@ def connection() -> Iterator[duckdb.DuckDBPyConnection]:
 def test_database_initialization_creates_required_tables(
     connection: duckdb.DuckDBPyConnection,
 ) -> None:
-    tables = {
-        row[0]
-        for row in connection.execute("SHOW TABLES").fetchall()
-    }
+    tables = {row[0] for row in connection.execute("SHOW TABLES").fetchall()}
 
     assert tables == {"pipeline_runs", "pipeline_state", "products_current"}
 

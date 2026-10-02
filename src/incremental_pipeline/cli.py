@@ -72,9 +72,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pipeline_name=args.pipeline_name,
             initial_start_at=args.initial_start_at,
             overlap=timedelta(hours=args.overlap_hours),
-            allowed_future_skew=timedelta(
-                minutes=args.allowed_future_skew_minutes
-            ),
+            allowed_future_skew=timedelta(minutes=args.allowed_future_skew_minutes),
         )
         output = _result_output(result, business_state_checksum(connection))
         print(json.dumps(output, indent=2))

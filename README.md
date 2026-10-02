@@ -86,6 +86,9 @@ The recovery tests also verify that a clean execution and a failed execution fol
 Run the test suite:
 
 ```powershell
+ruff format --check .
+ruff check .
+mypy
 pytest
 ```
 

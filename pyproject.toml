@@ -9,6 +9,7 @@ description = "Reliable incremental processing with deterministic deduplication 
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "duckdb>=1.5,<1.6",
+    # DuckDB imports pytz when materializing TIMESTAMPTZ values in Python.
     "pytz>=2026.4,<2027",
 ]
 
@@ -17,7 +18,9 @@ incremental-processing = "incremental_pipeline.cli:main"
 
 [project.optional-dependencies]
 dev = [
+    "mypy>=1.15,<2",
     "pytest>=8,<9",
+    "ruff>=0.9,<1",
 ]
 
 [tool.setuptools.packages.find]
@@ -25,3 +28,15 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "SIM", "UP"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src", "examples/run_demo.py"]
