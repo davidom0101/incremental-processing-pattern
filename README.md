@@ -34,20 +34,18 @@ DuckDB stores the target data, watermark and run history. Successful target chan
 
 The project uses Python 3.13.
 
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) before setting up the project.
+
 ```powershell
 git clone https://github.com/davidom0101/incremental-processing-pattern.git
 cd incremental-processing-pattern
-
-py -3.13 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-python -m pip install -e ".[dev]"
+uv sync
 ```
 
 Run the initial load:
 
 ```powershell
-incremental-processing --source examples/source/products_initial.csv --database products.duckdb --initial-start-at 2026-01-01T00:00:00Z
+uv run incremental-processing --source examples/source/products_initial.csv --database products.duckdb --initial-start-at 2026-01-01T00:00:00Z
 ```
 
 Successful runs return exit code `0` and print processing counters, timestamps, the watermark and a business state checksum as JSON.
@@ -61,7 +59,7 @@ There is no special retry mode. Run the same command again against the same accu
 The demo walks through six runs, including an intentionally injected failure after the target writes but before the transaction commits.
 
 ```powershell
-python examples/run_demo.py
+uv run python examples/run_demo.py
 ```
 
 | Run | Scenario | Result |
@@ -86,10 +84,10 @@ The recovery tests also verify that a clean execution and a failed execution fol
 Run the test suite:
 
 ```powershell
-ruff format --check .
-ruff check .
-mypy
-pytest
+uv run ruff format --check .
+uv run ruff check .
+uv run mypy
+uv run pytest
 ```
 
 The main tests check that:

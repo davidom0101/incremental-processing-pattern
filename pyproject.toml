@@ -16,7 +16,7 @@ dependencies = [
 [project.scripts]
 incremental-processing = "incremental_pipeline.cli:main"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "mypy>=1.15,<2",
     "pytest>=8,<9",
